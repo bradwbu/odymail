@@ -1,0 +1,311 @@
+/**
+ * Cross-browser compatibility CSS
+ * Provides fallbacks and fixes for different browsers
+ */
+
+/* CSS Custom Properties fallbacks */
+:root {
+  --supports-webcrypto: 0;
+  --supports-indexeddb: 0;
+  --supports-websocket: 0;
+  --supports-serviceworker: 0;
+  --supports-intersection-observer: 0;
+  --supports-resize-observer: 0;
+  --browser-supported: 1;
+  --prefers-reduced-motion: 0;
+}
+
+/* Browser-specific fixes */
+
+/* Safari-specific fixes */
+.browser-safari {
+  /* Fix for Safari's aggressive caching */
+  -webkit-transform: translateZ(0);
+}
+
+.browser-safari input[type="password"] {
+  /* Fix Safari password field styling */
+  -webkit-text-security: disc;
+}
+
+/* Firefox-specific fixes */
+.browser-firefox {
+  /* Fix Firefox's focus outline */
+  -moz-appearance: none;
+}
+
+.browser-firefox input[type="number"] {
+  /* Fix Firefox number input styling */
+  -moz-appearance: textfield;
+}
+
+.browser-firefox input[type="number"]::-webkit-outer-spin-button,
+.browser-firefox input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Edge-specific fixes */
+.browser-edge {
+  /* Fix Edge's default button styling */
+  -ms-overflow-style: -ms-autohiding-scrollbar;
+}
+
+/* Chrome-specific fixes */
+.browser-chrome {
+  /* Fix Chrome's autofill styling */
+  -webkit-autofill-strong-password-viewable: true;
+}
+
+/* Unsupported browser styling */
+.browser-unsupported {
+  /* Add visual indicators for unsupported browsers */
+  position: relative;
+}
+
+.browser-unsupported::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #dc3545, #fd7e14, #ffc107);
+  z-index: 9998;
+  animation: compatibility-warning 3s ease-in-out infinite;
+}
+
+@keyframes compatibility-warning {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+/* Feature-based styling */
+
+/* No Web Crypto support */
+.supports-webcrypto[data-supports-webcrypto="0"] .crypto-required {
+  opacity: 0.5;
+  pointer-events: none;
+  position: relative;
+}
+
+.supports-webcrypto[data-supports-webcrypto="0"] .crypto-required::after {
+  content: 'Requires modern browser';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(220, 53, 69, 0.9);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* No IndexedDB support */
+.supports-indexeddb[data-supports-indexeddb="0"] .storage-required {
+  display: none;
+}
+
+/* No WebSocket support */
+.supports-websocket[data-supports-websocket="0"] .realtime-required {
+  display: none;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* CSS-only reduced motion fallback */
+[data-prefers-reduced-motion="1"] *,
+[data-prefers-reduced-motion="1"] *::before,
+[data-prefers-reduced-motion="1"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* Progressive enhancement classes */
+
+/* Intersection Observer enhancements */
+.supports-intersection-observer .lazy-load {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.supports-intersection-observer .lazy-load.in-viewport {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Fallback for no Intersection Observer */
+.supports-intersection-observer[data-supports-intersection-observer="0"] .lazy-load {
+  opacity: 1;
+  transform: none;
+}
+
+/* Resize Observer enhancements */
+.supports-resize-observer .responsive-element {
+  transition: all 0.2s ease;
+}
+
+.supports-resize-observer .responsive-element.mobile-size {
+  /* Mobile-specific styles */
+  font-size: 14px;
+  padding: 8px;
+}
+
+.supports-resize-observer .responsive-element.desktop-size {
+  /* Desktop-specific styles */
+  font-size: 16px;
+  padding: 12px;
+}
+
+/* Flexbox fallbacks for older browsers */
+.flex-fallback {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+}
+
+.flex-fallback.column {
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+  -webkit-flex-direction: column;
+  -ms-flex-direction: column;
+  flex-direction: column;
+}
+
+.flex-fallback.center {
+  -webkit-box-pack: center;
+  -webkit-justify-content: center;
+  -ms-flex-pack: center;
+  justify-content: center;
+  -webkit-box-align: center;
+  -webkit-align-items: center;
+  -ms-flex-align: center;
+  align-items: center;
+}
+
+/* Grid fallbacks */
+.grid-fallback {
+  display: -ms-grid;
+  display: grid;
+}
+
+/* Fallback for browsers without grid support */
+@supports not (display: grid) {
+  .grid-fallback {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  
+  .grid-fallback > * {
+    flex: 1 1 300px;
+    margin: 8px;
+  }
+}
+
+/* Backdrop filter fallbacks */
+.backdrop-blur {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Fallback for browsers without backdrop-filter */
+@supports not (backdrop-filter: blur(10px)) {
+  .backdrop-blur {
+    background: rgba(255, 255, 255, 0.8);
+  }
+  
+  .backdrop-blur.dark {
+    background: rgba(0, 0, 0, 0.8);
+  }
+}
+
+/* Scroll behavior fallbacks */
+.smooth-scroll {
+  scroll-behavior: smooth;
+}
+
+/* Fallback for browsers without smooth scrolling */
+@supports not (scroll-behavior: smooth) {
+  .smooth-scroll {
+    /* JavaScript will handle smooth scrolling */
+  }
+}
+
+/* Custom scrollbar styling with fallbacks */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.3) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* Print styles for better cross-browser printing */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-break-before {
+    page-break-before: always;
+  }
+  
+  .print-break-after {
+    page-break-after: always;
+  }
+  
+  .print-break-inside-avoid {
+    page-break-inside: avoid;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .high-contrast-border {
+    border: 2px solid;
+  }
+  
+  .high-contrast-text {
+    font-weight: bold;
+  }
+}
+
+/* Focus visible polyfill styles */
+.focus-visible-polyfill:focus:not(.focus-visible) {
+  outline: none;
+}
+
+.focus-visible-polyfill.focus-visible {
+  outline: 2px solid #005fcc;
+  outline-offset: 2px;
+}

@@ -1,0 +1,79 @@
+{
+  "name": "encrypted-email-infrastructure-tests",
+  "version": "1.0.0",
+  "description": "Infrastructure and deployment tests for encrypted email service",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest --testTimeout=300000",
+    "test:deployment": "jest deployment.test.js --testTimeout=300000",
+    "test:load": "jest load-test.js --testTimeout=600000",
+    "test:security": "jest security.test.js --testTimeout=180000",
+    "test:all": "jest --testTimeout=600000 --verbose",
+    "test:watch": "jest --watch --testTimeout=300000",
+    "lint": "eslint *.js",
+    "report": "jest --coverage --testTimeout=300000"
+  },
+  "keywords": [
+    "infrastructure",
+    "deployment",
+    "testing",
+    "docker",
+    "kubernetes",
+    "load-testing"
+  ],
+  "author": "Encrypted Email Service Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "eslint": "^8.45.0",
+    "jest": "^29.5.0",
+    "supertest": "^6.3.0"
+  },
+  "dependencies": {
+    "axios": "^1.4.0",
+    "form-data": "^4.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "**/*.js",
+      "!**/node_modules/**",
+      "!**/coverage/**"
+    ],
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "html"
+    ],
+    "verbose": true,
+    "setupFilesAfterEnv": [
+      "./setup.js"
+    ]
+  },
+  "eslintConfig": {
+    "env": {
+      "node": true,
+      "jest": true,
+      "es2021": true
+    },
+    "extends": [
+      "eslint:recommended"
+    ],
+    "parserOptions": {
+      "ecmaVersion": 12,
+      "sourceType": "module"
+    },
+    "rules": {
+      "no-console": "off",
+      "no-unused-vars": [
+        "error",
+        {
+          "argsIgnorePattern": "^_"
+        }
+      ]
+    }
+  }
+}

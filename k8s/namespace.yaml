@@ -1,0 +1,8 @@
+# Kubernetes namespace for encrypted email service
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: encrypted-email
+  labels:
+    name: encrypted-email
+    environment: production

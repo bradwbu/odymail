@@ -1,0 +1,279 @@
+# GitLab CI/CD Pipeline for Encrypted Email Service
+stages:
+  - security
+  - test
+  - build
+  - deploy-staging
+  - deploy-production
+  - cleanup
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+  REGISTRY: $CI_REGISTRY
+  FRONTEND_IMAGE: $CI_REGISTRY_IMAGE/frontend
+  BACKEND_IMAGE: $CI_REGISTRY_IMAGE/backend
+
+# Security scanning
+security-scan:
+  stage: security
+  image: aquasec/trivy:latest
+  script:
+    - trivy fs --exit-code 0 --format template --template "@contrib/sarif.tpl" -o trivy-report.sarif .
+    - trivy fs --exit-code 1 --severity HIGH,CRITICAL .
+  artifacts:
+    reports:
+      sast: trivy-report.sarif
+    expire_in: 1 week
+  only:
+    - merge_requests
+    - main
+    - develop
+
+# Frontend tests
+frontend-test:
+  stage: test
+  image: node:18-alpine
+  cache:
+    key: frontend-$CI_COMMIT_REF_SLUG
+    paths:
+      - packages/frontend/node_modules/
+  before_script:
+    - cd packages/frontend
+    - npm ci
+  script:
+    - npm run lint
+    - npm run type-check
+    - npm run test -- --coverage
+    - npm run build
+  artifacts:
+    paths:
+      - packages/frontend/dist/
+      - packages/frontend/coverage/
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: packages/frontend/coverage/cobertura-coverage.xml
+    expire_in: 1 week
+  coverage: '/Lines\s*:\s*(\d+\.\d+)%/'
+
+# Backend tests
+backend-test:
+  stage: test
+  image: node:18-alpine
+  services:
+    - name: mongo:6.0
+      alias: mongodb
+      command: ["mongod", "--bind_ip_all", "--replSet", "rs0"]
+    - name: redis:7-alpine
+      alias: redis
+  variables:
+    MONGODB_URI: "mongodb://mongodb:27017/test"
+    REDIS_URL: "redis://redis:6379"
+    JWT_SECRET: "test-jwt-secret"
+    ENCRYPTION_KEY: "test-encryption-key-32-characters"
+    NODE_ENV: "test"
+  cache:
+    key: backend-$CI_COMMIT_REF_SLUG
+    paths:
+      - packages/backend/node_modules/
+  before_script:
+    - cd packages/backend
+    - npm ci
+  script:
+    - npm run lint
+    - npm run type-check
+    - npm run test
+    - npm run build
+  artifacts:
+    paths:
+      - packages/backend/dist/
+      - packages/backend/coverage/
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: packages/backend/coverage/cobertura-coverage.xml
+    expire_in: 1 week
+  coverage: '/Lines\s*:\s*(\d+\.\d+)%/'
+
+# Build Docker images
+build-frontend:
+  stage: build
+  image: docker:24-dind
+  services:
+    - docker:24-dind
+  needs:
+    - frontend-test
+    - security-scan
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - docker build -f packages/frontend/Dockerfile -t $FRONTEND_IMAGE:$CI_COMMIT_SHA .
+    - docker tag $FRONTEND_IMAGE:$CI_COMMIT_SHA $FRONTEND_IMAGE:latest
+    - docker push $FRONTEND_IMAGE:$CI_COMMIT_SHA
+    - docker push $FRONTEND_IMAGE:latest
+  only:
+    - main
+    - develop
+    - tags
+
+build-backend:
+  stage: build
+  image: docker:24-dind
+  services:
+    - docker:24-dind
+  needs:
+    - backend-test
+    - security-scan
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - docker build -f packages/backend/Dockerfile -t $BACKEND_IMAGE:$CI_COMMIT_SHA .
+    - docker tag $BACKEND_IMAGE:$CI_COMMIT_SHA $BACKEND_IMAGE:latest
+    - docker push $BACKEND_IMAGE:$CI_COMMIT_SHA
+    - docker push $BACKEND_IMAGE:latest
+  only:
+    - main
+    - develop
+    - tags
+
+# Deploy to staging
+deploy-staging:
+  stage: deploy-staging
+  image: bitnami/kubectl:latest
+  needs:
+    - build-frontend
+    - build-backend
+  environment:
+    name: staging
+    url: https://staging.yourdomain.com
+  before_script:
+    - echo $KUBE_CONFIG_STAGING | base64 -d > kubeconfig
+    - export KUBECONFIG=kubeconfig
+  script:
+    # Update image tags
+    - sed -i "s|encrypted-email-frontend:latest|$FRONTEND_IMAGE:$CI_COMMIT_SHA|g" k8s/frontend-deployment.yaml
+    - sed -i "s|encrypted-email-backend:latest|$BACKEND_IMAGE:$CI_COMMIT_SHA|g" k8s/backend-deployment.yaml
+    
+    # Deploy to Kubernetes
+    - kubectl apply -f k8s/namespace.yaml
+    - kubectl apply -f k8s/configmap.yaml
+    - kubectl apply -f k8s/secrets.yaml
+    - kubectl apply -f k8s/persistent-volumes.yaml
+    - kubectl apply -f k8s/frontend-deployment.yaml
+    - kubectl apply -f k8s/backend-deployment.yaml
+    - kubectl apply -f k8s/ingress.yaml
+    
+    # Wait for deployment
+    - kubectl rollout status deployment/encrypted-email-frontend -n encrypted-email --timeout=300s
+    - kubectl rollout status deployment/encrypted-email-backend -n encrypted-email --timeout=300s
+    
+    # Health checks
+    - sleep 30
+    - curl -f https://staging.yourdomain.com/health
+    - curl -f https://staging.yourdomain.com/api/health
+  only:
+    - develop
+
+# Deploy to production
+deploy-production:
+  stage: deploy-production
+  image: bitnami/kubectl:latest
+  needs:
+    - build-frontend
+    - build-backend
+  environment:
+    name: production
+    url: https://yourdomain.com
+  when: manual
+  before_script:
+    - echo $KUBE_CONFIG_PRODUCTION | base64 -d > kubeconfig
+    - export KUBECONFIG=kubeconfig
+  script:
+    # Create backup
+    - kubectl exec -n encrypted-email deployment/mongodb -- mongodump --out /tmp/backup-$(date +%Y%m%d-%H%M%S)
+    
+    # Update image tags
+    - sed -i "s|encrypted-email-frontend:latest|$FRONTEND_IMAGE:$CI_COMMIT_SHA|g" k8s/frontend-deployment.yaml
+    - sed -i "s|encrypted-email-backend:latest|$BACKEND_IMAGE:$CI_COMMIT_SHA|g" k8s/backend-deployment.yaml
+    
+    # Blue-Green deployment
+    - kubectl apply -f k8s/namespace.yaml
+    - kubectl apply -f k8s/configmap.yaml
+    - kubectl apply -f k8s/secrets.yaml
+    - kubectl apply -f k8s/persistent-volumes.yaml
+    - kubectl apply -f k8s/frontend-deployment.yaml
+    - kubectl apply -f k8s/backend-deployment.yaml
+    
+    # Wait for new deployment
+    - kubectl rollout status deployment/encrypted-email-frontend -n encrypted-email --timeout=600s
+    - kubectl rollout status deployment/encrypted-email-backend -n encrypted-email --timeout=600s
+    
+    # Health checks
+    - sleep 60
+    - curl -f https://yourdomain.com/health
+    - curl -f https://yourdomain.com/api/health
+    
+    # Switch traffic
+    - kubectl apply -f k8s/ingress.yaml
+    
+    # Post-deployment monitoring
+    - |
+      for i in {1..10}; do
+        echo "Health check $i/10"
+        curl -f https://yourdomain.com/health
+        curl -f https://yourdomain.com/api/health
+        sleep 30
+      done
+  only:
+    - main
+    - tags
+
+# Rollback production
+rollback-production:
+  stage: deploy-production
+  image: bitnami/kubectl:latest
+  environment:
+    name: production
+    url: https://yourdomain.com
+  when: manual
+  before_script:
+    - echo $KUBE_CONFIG_PRODUCTION | base64 -d > kubeconfig
+    - export KUBECONFIG=kubeconfig
+  script:
+    # Rollback deployments
+    - kubectl rollout undo deployment/encrypted-email-frontend -n encrypted-email
+    - kubectl rollout undo deployment/encrypted-email-backend -n encrypted-email
+    
+    # Wait for rollback
+    - kubectl rollout status deployment/encrypted-email-frontend -n encrypted-email --timeout=300s
+    - kubectl rollout status deployment/encrypted-email-backend -n encrypted-email --timeout=300s
+    
+    # Verify rollback
+    - sleep 30
+    - curl -f https://yourdomain.com/health
+    - curl -f https://yourdomain.com/api/health
+  only:
+    - main
+    - tags
+
+# Cleanup old images
+cleanup:
+  stage: cleanup
+  image: docker:24-dind
+  services:
+    - docker:24-dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    # Clean up old images (keep last 5 versions)
+    - |
+      for image in frontend backend; do
+        IMAGES=$(docker images --format "table {{.Repository}}:{{.Tag}}" | grep "$CI_REGISTRY_IMAGE/$image" | tail -n +6)
+        if [ ! -z "$IMAGES" ]; then
+          echo "$IMAGES" | xargs docker rmi || true
+        fi
+      done
+  when: manual
+  only:
+    - main
