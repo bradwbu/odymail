@@ -1,6 +1,10 @@
 # CI/CD Pipeline for Encrypted Email Service
 name: CI/CD Pipeline
 
+permissions:
+  contents: read
+  security-events: write
+  
 on:
   push:
     branches: [ main, develop ]
