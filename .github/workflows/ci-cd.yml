@@ -87,7 +87,7 @@ jobs:
         run: npm run build
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@ea165f8
         with:
           name: frontend-build
           path: packages/frontend/dist
@@ -150,7 +150,7 @@ jobs:
         run: npm run build
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@ea165f8
         with:
           name: backend-build
           path: packages/backend/dist
