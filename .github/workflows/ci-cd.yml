@@ -86,11 +86,13 @@ jobs:
       - name: Build application
         run: npm run build
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-build
-          path: packages/frontend/dist
+    
+       - name: Upload build artifacts
+         uses: actions/upload-artifact@ea165f8 # v4.6.2
+         with:
+           name: frontend-build
+           path: packages/frontend/dist
+
 
   # Backend tests and build
   backend-test:
@@ -149,11 +151,13 @@ jobs:
       - name: Build application
         run: npm run build
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-build
-          path: packages/backend/dist
+     
+       - name: Upload build artifacts
+         uses: actions/upload-artifact@ea165f8 # v4.6.2
+         with:
+           name: backend-build
+           path: packages/backend/dist
+
 
   # Docker image build and push
   build-images:
